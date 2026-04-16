@@ -368,8 +368,6 @@ export default function Chatting({onBack}) {
   const { message } = useChat();
   const { handleSelectMedia } = useChat()
   const [add, setAdd] = useState<boolean>(false)
-const [conversationId, setConversationId] = useState<string | null>(null)
-  const [chats, setChats] = useState([])
   const [contextMenu, setContextMenu] = useState<ContextMenu>({
     visible: false,
     x: 0,
@@ -465,55 +463,53 @@ const [conversationId, setConversationId] = useState<string | null>(null)
 const { friendId } = useParams();
 const UserId = db.auth.getUser().id;
 
-useEffect(() => {
-  async function setup(){
-    // sort id so order dkesnt matter
+
+const { data: conversationId} = useQuery({
+  queryKey: ['conversation', friendId, UserId],
+  queryFn: async()=>{
+    if(!friendId || !UserId) return;
+  // sort id so order dkesnt matter
   const [id1, id2] = [UserId, friendId].sort();
-  
-  //list from database to check if it exixt
- const exist = await db.listDocuments("convo", {
-   filter: `user1_id="${id1}" && user2_id ="${id2}"`
+  const exist = await db.listDocuments("convo", {
+   filter: `user1_id="${id1}" && user2_id="${id2}"`
  })
- 
-if(exist.data?.length > 1){
-  setConversationId(exist.data[0]?.id)
+ console.log(exist)
+   //list from database to check if it exixt
+if(exist.data?.length > 0){
   alert("we don talk with this convo")
+  console.log(exist.data[0]?.id)
+  return exist.data[0]?.id?? null
 }else{
   alert("we never tslk bfr")
-  try{
   const newConvo = await db.createDocument("convo", {
     user1_id: id1,
     user2_id: id2,
   }) 
-  setConversationId(newConvo.id)
   alert("i dom create sga")
-  }catch(error){
-    console.log(error.message)
-    alert(error)
+  return newConvo.id
   }
-}
-  }
-setup();
-}, [friendId])
+},
+  enabled:!!friendId &&!!UserId,
+  staleTime: Infinity,
+})
+
+
 
 //list messages
-useEffect(() => {
-  if(!conversationId) return
- 
- async function Load(){
-   alert("hmmm")
-   try{
-     const res = await db.listDocuments("messages", {
+const { data: chat } = useQuery({
+  queryKey: ["chat", conversationId],
+  queryFn: async()=>{
+    if(!conversationId || UserId) return [];
+  const res = await db.listDocuments("messages", {
        filter: `convoId="${conversationId}"`
      })
-     setChats(res.data)
-     console.log(chats)
-   }catch(error){
-     console.log(error.message)
-   }
- }
- Load();
-}, [conversationId])
+     return res
+  },
+  enabled : !! conversationId
+})
+
+ 
+ 
 
 
 //send message 
