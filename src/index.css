@@ -1,0 +1,13 @@
+html{
+  scroll-behavior: smooth;
+}
+body{
+  background: #0D0F14;
+  scroll-behavior: smooth;
+}
+.overscroll-contain {
+  overscroll-behavior: contain;
+  }
+.touch-pan-y { 
+  touch-action: pan-y;
+  }
