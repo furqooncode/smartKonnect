@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../Context/ToggleTheme.tsx';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FormatHometime } from './FormatHometime.tsx'
 
 interface filter {
   name: string,
@@ -16,6 +17,57 @@ const FILTERS:filter[] = [
   { name:'Groups', value:1 },
   { name:'Favourites', value: null },
 ];
+
+function ChatListSkeleton({ count = 10 }: { count?: number }) {
+  const { colors } = useTheme();
+
+  return (
+    <div className="flex flex-col h-full w-full animate-pulse"
+    style={{ background: colors.background }}>
+
+      {/* Search bar skeleton */}
+      <div className="px-4 pt-[85px] pb-3">
+        <div className="h-[48px] w-full rounded-2xl"
+        style={{ background: colors.skeleton }} />
+      </div>
+
+      {/* Filter tabs skeleton */}
+      <div className="flex gap-2 px-4 pb-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-[32px] w-[70px] rounded-xl shrink-0"
+          style={{ background: colors.skeleton }} />
+        ))}
+      </div>
+
+      {/* Chat items skeleton */}
+      <div className="flex flex-col gap-1 px-4">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 p-3 rounded-2xl"
+          style={{ background: colors.skeleton + '40' }}>
+
+            {/* Avatar */}
+            <div className="shrink-0 w-[52px] h-[52px] rounded-full"
+            style={{ background: colors.skeleton }} />
+
+            {/* Content */}
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              <div className="flex justify-between items-center gap-2">
+                <div className="h-4 rounded-lg w-[140px]"
+                style={{ background: colors.skeleton }} />
+                <div className="h-3 rounded-lg w-[40px] shrink-0"
+                style={{ background: colors.skeleton }} />
+              </div>
+              <div className="h-3 rounded-lg w-[80%]"
+              style={{ background: colors.skeleton }} />
+            </div>
+
+          </div>
+        ))}
+      </div>
+
+    </div>
+  )
+}
 
 export function Filter() {
   const { colors } = useTheme();
@@ -130,22 +182,25 @@ export default function Addchat({ handleClick }) {
   const navigate = useNavigate();
   const userId = db.auth.getUser().id;
 
-  const { data: fetched, isError, isPending, error } = useQuery({
-    queryKey: ['Chat'],
+  const { data, isError, isPending, error } = useQuery({
+    queryKey: ['Dms'],
     queryFn: async () => {
-      const res = await db.auth.listUsers();
-      return res;
+     const friends = await db.auth.listUsers();
+      const friendDp = await db.listDocuments("Details")
+      const userConvo = await db.listDocuments("convo")
+      return { friends, friendDp, userConvo }
     },
   });
-
+  
+  const friends = data?.friends
+const friendDp = data?.friendDp
+const userConvo = data?.userConvo
+console.log(friends)
+console.log("userConvo", userConvo)
+console.log("friendDp", friendDp)
   // Loading state
   if (isPending) {
-    return (
-      <div className="flex flex-col h-full w-full items-center justify-center" 
-           style={{ background: colors.background }}>
-        <p style={{ color: colors.text }}>Loading chats...</p>
-      </div>
-    );
+    return <ChatListSkeleton />
   }
 
   // Error state
@@ -167,29 +222,41 @@ export default function Addchat({ handleClick }) {
         <Filter />
 
         <div className="flex flex-col gap-1 px-4 pb-24 w-full">
-          {!fetched || fetched.data.length === 0 ? (
+          {!friends || friends.data.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-96">
               <p style={{ color: colors.textSecondary }}>No users found</p>
             </div>
           ) : (
-            fetched.data.map((users) => (
-              <ChatList 
-                key={users.id}
-                id={users.id}
-                name={userId === users.id 
-                  ? `${users.data.username} (yourself)` 
-                  : users.data.username}
-                text="Hey whatsup bro..."
-                time="Today"
-                num={2}
-                isOnline={true}
-                isAction="send"
-                Imgsrc="https://avatars.githubusercontent.com/u/216797756?s=96&v=4"
-                sent="sent"
-                handleClick={() => handleClick(users.id)}
-              />
-            ))
-          )}
+  friends.data.map((users) => {
+  
+  const userProfile = friendDp?.find((dp) => dp.data.user_id === users.id)
+  console.log("userProfile", userProfile)
+  
+  const lastDm = userConvo?.find((dm) => dm.data.user1_id === users.id)
+  console.log("lastDm", lastDm)
+  
+  return (
+    <ChatList 
+      key={users.id}
+      id={users.id}
+      name={userId === users.id 
+        ? `${users.data.username} (yourself)` 
+        : users.data.username}
+      text={lastDm?.data?.last_message || "Start a conversation"}
+      time={
+      FormatHometime(lastDm?.data?.last_messageTime) || ""}
+      num={lastDm?.data?.last_sender !== userId 
+  ? lastDm?.data?.unread_count 
+  : 0}
+      isOnline={true}
+      isAction="send"
+      Imgsrc={userProfile?.data?.userimg || ''}
+      sent="sent"
+      handleClick={() => handleClick(users.id)}
+    />
+  )
+})
+)}
         </div>
       </div>
 

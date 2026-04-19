@@ -115,7 +115,8 @@ export function AuthProvider({children} : {children: React.ReactNode}){
   //first list users
 const past = await db.auth.listUsers();
 console.log(past)
-const taken = past.data.some((user) => user.data.username === username)
+const taken = past.data.some((user) => user.data.username.trim().toLowerCase()
+=== username.trim().toLowerCase())
 
 if(taken){
   throw new Error("username already taken!!")
@@ -172,7 +173,7 @@ if(taken){
 }
 
   console.log("saving to db")
-   const details : moreData = await db.createDocument("Details", {
+   const details : moreData = await db.createDocument("details", {
      occupation,
      country,
      state,

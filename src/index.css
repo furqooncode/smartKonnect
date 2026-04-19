@@ -1,9 +1,7 @@
-html{
+html, body {
+  height: 100%;
   scroll-behavior: smooth;
-}
-body{
   background: #0D0F14;
-  scroll-behavior: smooth;
 }
 .overscroll-contain {
   overscroll-behavior: contain;

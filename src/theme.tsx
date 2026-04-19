@@ -18,6 +18,7 @@ export const DarkColors = {
   unreadBadgeText: '#FFFFFF',
   avatarBg: '#2A2D36',
   sent: '#22C55E',
+  skeleton: '#1E2130',
 }
 
 export const LightColors = {
@@ -39,4 +40,5 @@ export const LightColors = {
   unreadBadgeText: '#FFFFFF',
   avatarBg: '#E5E7EB',
   sent: '#16A34A',
+  skeleton: '#E2E8F0'
 }

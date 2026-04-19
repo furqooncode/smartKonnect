@@ -4,7 +4,8 @@ import { useChat } from '../Context/Chatcontext.tsx';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useRef } from 'react'
 import db from '../lib/util.jsx';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery , useQueryClient} from '@tanstack/react-query';
+import { FormatTime } from './FormatTime.tsx'
 
 interface Chatoption {
   name: string,
@@ -37,30 +38,39 @@ function ChatSkeleton() {
   const { colors } = useTheme();
   return (
     <div className="flex flex-col h-full" style={{ background: colors.background }}>
-      <nav className="shrink-0 flex justify-between p-3 items-center h-[60px] animate-pulse"
+      <nav className="shrink-0 flex justify-between p-3 items-center h-[60px]
+      animate-pulse"
         style={{ background: colors.background, borderBottom: `1px solid ${colors.border}` }}>
         <div className="flex gap-3 items-center">
-          <div className="w-10 h-10 bg-gray-400 rounded-full" />
+          <div className="w-10 h-10 rounded-full" style={{ background: colors.skeleton }} />
           <div className="space-y-2">
-            <div className="h-5 w-40 bg-gray-400 rounded" />
-            <div className="h-3 w-28 bg-gray-400 rounded" />
+            <div className="h-5 w-40 rounded" style={{ background: colors.skeleton }} />
+            <div className="h-3 w-28 rounded" style={{ background: colors.skeleton }} />
           </div>
         </div>
-        <div className="w-10 h-10 bg-gray-400 rounded-full" />
+        <div className="w-10 h-10 rounded-full" style={{ background: colors.skeleton }} />
       </nav>
 
       <div className="flex-1 p-4 space-y-6 overflow-hidden">
-        <div className="flex justify-end"><div className="h-16 w-64 bg-gray-400 rounded-3xl" /></div>
-        <div className="flex justify-start"><div className="h-12 w-56 bg-gray-400 rounded-3xl" /></div>
-        <div className="flex justify-end"><div className="h-20 w-72 bg-gray-400 rounded-3xl" /></div>
+        <div className="flex justify-end">
+          <div className="h-16 w-64 rounded-3xl" style={{ background: colors.skeleton }} />
+        </div>
+        <div className="flex justify-start">
+          <div className="h-12 w-56 rounded-3xl" style={{ background: colors.skeleton }} />
+        </div>
+        <div className="flex justify-end">
+          <div className="h-20 w-72 rounded-3xl" style={{ background: colors.skeleton }} />
+        </div>
       </div>
 
       <div className="shrink-0 p-3" style={{ background: colors.background }}>
-        <div className="h-14 bg-gray-400 rounded-3xl w-full" />
+        <div className="h-14 rounded-3xl w-full" style={{ background: colors.skeleton }} />
       </div>
     </div>
   );
 }
+
+
 
 // ── MODERN EMPTY STATE ──
 function EmptyChatState() {
@@ -264,6 +274,15 @@ function Input({ add, setAdd, inputRef, handleSendText }: InputProps){
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   }
 
+const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+useEffect(() => {
+  if(message === '' && textareaRef.current) {
+    textareaRef.current.style.height = 'auto'
+  }
+}, [message])
+
+
   return(
     <div ref={inputRef} className="shrink-0 flex items-end justify-between p-3 gap-2 relative z-10"
     style={{ backgroundColor: colors.background }}>
@@ -322,6 +341,7 @@ function Input({ add, setAdd, inputRef, handleSendText }: InputProps){
           <textarea
           rows={1}
           value={message}
+          ref={textareaRef}
           className="placeholder:text-gray-400 w-full text-[15px] font-normal
           outline-none resize-none overflow-y-auto bg-transparent"
           placeholder="write message"
@@ -365,7 +385,8 @@ function Input({ add, setAdd, inputRef, handleSendText }: InputProps){
 
 export default function Chatting({onBack}) {
   const { colors } = useTheme()
-  const { message } = useChat();
+  const { message, clearAll } = useChat();
+  const queryClient = useQueryClient()
   const { handleSelectMedia } = useChat()
   const [add, setAdd] = useState<boolean>(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>({
@@ -458,62 +479,140 @@ export default function Chatting({onBack}) {
       }
     },
   ]
-  
+
+
+// scroll dowm chatting
+
+
+ 
   // setting up chatting konnection privacy
 const { friendId } = useParams();
 const UserId = db.auth.getUser().id;
-
+const chatContainerRef = useRef(null);
+  let currentUnread = 0;
 
 const { data: conversationId} = useQuery({
   queryKey: ['conversation', friendId, UserId],
   queryFn: async()=>{
     if(!friendId || !UserId) return;
   // sort id so order dkesnt matter
+  
   const [id1, id2] = [UserId, friendId].sort();
+  console.log(UserId)
+  console.log(friendId)
+  //list from database to check if it exixt
   const exist = await db.listDocuments("convo", {
-   filter: `user1_id="${id1}" && user2_id="${id2}"`
+   filters:{ 
+   user1_id : id1,
+   user2_id : id2,
+   }
  })
- console.log(exist)
-   //list from database to check if it exixt
-if(exist.data?.length > 0){
-  alert("we don talk with this convo")
-  console.log(exist.data[0]?.id)
-  return exist.data[0]?.id?? null
+ console.log("exist", exist)
+ 
+ console.log(exist.length)
+   
+if(exist.length > 0){
+  return exist[0].id
 }else{
-  alert("we never tslk bfr")
   const newConvo = await db.createDocument("convo", {
     user1_id: id1,
     user2_id: id2,
-  }) 
-  alert("i dom create sga")
+  })
   return newConvo.id
   }
 },
   enabled:!!friendId &&!!UserId,
-  staleTime: Infinity,
 })
 
 
 
 //list messages
-const { data: chat } = useQuery({
+const { data: chat, isPending:chatpending} = useQuery({
   queryKey: ["chat", conversationId],
   queryFn: async()=>{
-    if(!conversationId || UserId) return [];
+    if(!conversationId && UserId) return [];
+
   const res = await db.listDocuments("messages", {
-       filter: `convoId="${conversationId}"`
+       filters:{
+         convoId: conversationId
+       },
      })
+     console.log("messGes")
+    console.log("chat", res)
      return res
   },
-  enabled : !! conversationId
+  enabled :!!friendId && !!conversationId
 })
 
- 
- 
 
+useEffect(() => {
+  if(!conversationId) return
+
+  console.log("watcher starting for:", conversationId)
+
+  const watcher = db.realtime.collection("messages")
+
+  watcher.onConnected(() => {
+    console.log("realtime connected")
+  })
+
+  watcher.onCreate((payload) => {
+  const msgData = payload.data.data
+
+  if(msgData.convoId === conversationId) {
+    queryClient.setQueryData(["chat", conversationId], (prev: any) => {
+      const newMsg = {
+        id: payload.data.id,
+        data: msgData  // wrap it the same way your existing messages are structured
+      }
+      if(!prev) return [newMsg]
+      return [...prev, newMsg]
+    })
+  } else {
+      console.log("no match — convoId mismatch")
+    }
+  })
+
+  watcher.connect()
+
+  return () => {
+    watcher.disconnect()
+  }
+}, [conversationId])
+
+useEffect(() => {
+  if(!conversationId) return
+  db.updateDocument("convo", conversationId, {
+    unread_count: 0
+  })
+}, [conversationId])
+
+
+
+const { data: fetched, isError, isPending, error } = useQuery({
+    queryKey: ['Chat'],
+    queryFn: async () => {
+      const res = await db.auth.listUsers();
+      return res;
+    },
+  });
+
+useEffect(() => {
+  const timer = setTimeout(() => {
+    if(chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, 100)
+  return () => clearTimeout(timer)
+}, [chat]);
+ 
 
 //send message 
 async function SendMessage(){
+
 try{
   await db.createDocument("messages", {
     text: message,
@@ -521,24 +620,28 @@ try{
     isread: false,
     mediaurl:null,
     convoId: conversationId,
-    time: "today",
+    time: new Date().toISOString(),
   })
+  clearAll();
+  
+  await db.updateDocument("convo", conversationId, {
+  last_message: message,
+  last_messageTime: new Date().toISOString(),
+  last_sender: UserId,
+  unread_count: currentUnread + 1,
+})
+
   }catch(error){
     alert(error.message)
   }
 }
 
 
+if(!friendId){
+    return <EmptyChatState />
+}
 
-  const { data: fetched, isError, isPending, error } = useQuery({
-    queryKey: ['Chat'],
-    queryFn: async () => {
-      const res = await db.auth.listUsers();
-      return res;
-    },
-  });
- 
-  if(isPending){
+  if(chatpending){
     return <ChatSkeleton />;
   }
  
@@ -546,24 +649,91 @@ try{
     return <p style={{color: colors.text}}>An error occurred</p>
   }
  
-  if(!friendId){
-    return <EmptyChatState />;
-  }
+  console.log("fetched", fetched)
  
   const friendName = fetched.data.find(u => u.id === friendId)
+console.log(friendName)
 
   return(
-    <div className="flex flex-col h-full" style={{ background: colors.background }}>
+    <div className="flex flex-col" style={{
+    height: "100dvh",
+    background: colors.background
+    }}>
 
       <Head onBack={onBack} name={friendName?.data?.username || "Chat"} active="last seen recently" />
 
 {/* ── MESSAGES AREA ── */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 overscroll-contain">
-        <Sender msg="Hi?" status="delivered" time="07:30am" onLongPress={handleLongPress} />
-        <Receiver msg="Hello" time="07:31am" onLongPress={handleLongPress} />
-        <Sender msg="Good morning, I wanted to follow up on the project proposal I sent last week. Have you had the chance to review it?" status="delivered" time="08:02am" onLongPress={handleLongPress} />
-        <Receiver msg="Good morning. Yes I went through it yesterday evening. Honestly there are some parts I think we need to revisit before we move forward." time="08:05am" onLongPress={handleLongPress} />
+     
+
+<div 
+  ref={chatContainerRef}
+  className="flex-1 overflow-y-auto p-3 space-y-3 h-full overscroll-contain"
+  style={{ 
+    background: colors.background,
+    overflowAnchor: 'none',
+  }}
+>
+  {!chat || chat.length === 0 ? (
+    <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
+      
+      {/* Icon container */}
+      <div 
+        className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
+        style={{ background: colors.surface }}
+      >
+        <i className="fas fa-comment-dots text-4xl" style={{ color: colors.accent }} />
       </div>
+
+      {/* Text */}
+      <h3 className="text-xl font-semibold mb-2" style={{ color: colors.textPrimary }}>
+        No messages yet
+      </h3>
+      <p className="text-sm max-w-[240px] leading-relaxed" style={{ color: colors.textSecondary }}>
+        Be the first to say something. Send a message to get the conversation started.
+      </p>
+
+      {/* Divider hint */}
+      <div className="mt-8 flex items-center gap-2">
+        <div className="w-8 h-[1px]" style={{ background: colors.border }} />
+        <span className="text-xs font-medium" style={{ color: colors.textSecondary }}>
+          Messages are end-to-end encrypted
+        </span>
+        <div className="w-8 h-[1px]" style={{ background: colors.border }} />
+      </div>
+
+      {/* Lock icon */}
+      <div className="mt-3">
+        <i className="fas fa-lock text-xs" style={{ color: colors.textSecondary }} />
+      </div>
+
+    </div>
+  ) : (
+    [...chat]
+      .sort((a, b) => new Date(a.data.time).getTime() - new Date(b.data.time).getTime())
+      .map((msg) => (
+        msg.data.senderId === UserId ? (
+          <Sender
+            key={msg.id}
+            msg={msg.data.text}
+            time={FormatTime(msg.data.time)}
+            status={msg.data.isread === false ? "delivered" : "seen"}
+            onLongPress={handleLongPress}
+          />
+        ) : (
+          <Receiver
+            key={msg.id}
+            msg={msg.data.text}
+            time={FormatTime(msg.data.time)}
+            status={msg.data.isread === false ? "delivered" : "seen"}
+            onLongPress={handleLongPress}
+          />
+        )
+      ))
+  )}
+</div>
+
+
+
 
       {/* ── INPUT AREA ── */}
       <Input 
