@@ -2,6 +2,7 @@ import { useTheme } from '../Context/ToggleTheme.tsx';
 import { useNavigate } from "react-router-dom"
 export default function Friendprofile() {
   const { colors } = useTheme()
+  const navigate = useNavigate();
   return(
     <div>
       {/*Head*/}

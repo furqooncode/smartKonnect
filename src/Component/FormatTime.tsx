@@ -1,4 +1,4 @@
-export function FormatTime(isoString) {
+export function FormatTime(isoString: string): string {
   if (!isoString) return '—';
 
   const date = new Date(isoString);
@@ -17,6 +17,5 @@ export function FormatTime(isoString) {
   const formattedHours = String(hours).padStart(2, '0');
   const formattedMinutes = String(minutes).padStart(2, '0');
 
-  // ←←← THIS MUST USE BACKTICKS ` ` (not single or double quotes)
-  return `\ ${formattedHours}:${formattedMinutes} ${ampm}`;
+  return `${formattedHours}:${formattedMinutes} ${ampm}`;
 }

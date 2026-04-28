@@ -3,24 +3,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const MobileOptions = [
-  {
-    name: "Add Friends", 
-    path: "/Addfriend", 
-    icon: "fa fa-user-plus" 
-  },
-  {
-    name: "Create Group", 
-    path: "/Creategroup",
-    icon: "fa fa-users"
-  },
-  {
-    name: "Settings",
-    path: "/Settings", 
-    icon: "fa fa-cog" 
-  },
-]
+  { name: "Add Friends", path: "/Addfriend", icon: "fa fa-user-plus" },
+  { name: "Create Group", path: "/Creategroup", icon: "fa fa-users" },
+  { name: "Settings", path: "/Settings", icon: "fa fa-cog" },
+];
 
-export default function Head({ title, icon }: { title: string; icon: string }) {
+export default function Head({ title, icon }: { title: string; icon?: string | null }) {
   const { colors } = useTheme();
   const navigate = useNavigate();
   const [open, setOpen] = useState<boolean>(false);
@@ -35,15 +23,15 @@ export default function Head({ title, icon }: { title: string; icon: string }) {
           {title}
         </h3>
         <button
-          className="w-[42px] h-[42px] rounded-full border-none outline-none flex items-center justify-center"
+          className="w-[42px] h-[42px] rounded-full border-none outline-none
+          flex items-center justify-center text-base"
           style={{ background: colors.surface, color: colors.textPrimary }}
           onClick={() => setOpen(true)}
         >
-          <i className="fa fa-ellipsis-v text-base" />
+          {icon && <i className={icon} />}
         </button>
       </nav>
 
-      {/* Backdrop */}
       {open && (
         <div
           className="fixed inset-0 bg-black/40 z-[100]"
@@ -51,7 +39,6 @@ export default function Head({ title, icon }: { title: string; icon: string }) {
         />
       )}
 
-      {/* Slide-in menu from right */}
       <div
         className="fixed top-[70px] right-0 z-[200] flex flex-col py-2 rounded-bl-2xl rounded-tl-2xl overflow-hidden transition-all duration-300"
         style={{

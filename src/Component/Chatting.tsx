@@ -17,6 +17,7 @@ interface InputProps {
   add: boolean,
   setAdd: (val: boolean) => void,
   inputRef: React.RefObject<HTMLDivElement>,
+  handleSendText: () => void,
 }
 
 interface AddOption {
@@ -92,7 +93,11 @@ function EmptyChatState() {
   );
 }
 
-export function Head({onBack, name, active}){
+export function Head({onBack, name, active}:{
+  onBack: ()=> void,
+  name: string,
+  active: string,
+}){
   const [open, setOpen] = useState<boolean>(false);
   const { colors } = useTheme();
   const navigate = useNavigate()
@@ -264,7 +269,7 @@ export function Receiver({msg, time, onLongPress}: {
   )
 }
 
-function Input({ add, setAdd, inputRef, handleSendText }: InputProps){
+function Input({setAdd, inputRef, handleSendText }: InputProps){
   const { colors } = useTheme();
   const { message, setMessage, selectedMedia, removeMedia } = useChat();
 
@@ -383,7 +388,9 @@ useEffect(() => {
   )
 }
 
-export default function Chatting({onBack}) {
+export default function Chatting({onBack} : {
+  onBack:()=> void,
+}) {
   const { colors } = useTheme()
   const { message, clearAll } = useChat();
   const queryClient = useQueryClient()
@@ -413,7 +420,7 @@ export default function Chatting({onBack}) {
     })
   }
 
-  function closeMenu() {
+  function closeMenu(): void {
     setContextMenu(prev => ({ ...prev, visible: false }))
   }
 
@@ -487,8 +494,8 @@ export default function Chatting({onBack}) {
  
   // setting up chatting konnection privacy
 const { friendId } = useParams();
-const UserId = db.auth.getUser().id;
-const chatContainerRef = useRef(null);
+const UserId = db.auth.getUser()?.id;
+const chatContainerRef = useRef<HTMLDivElement>(null);
   let currentUnread = 0;
 
 const { data: conversationId} = useQuery({
@@ -534,7 +541,7 @@ const { data: chat, isPending:chatpending} = useQuery({
 
   const res = await db.listDocuments("messages", {
        filters:{
-         convoId: conversationId
+         convoId: conversationId ?? ""
        },
      })
      console.log("messGes")
@@ -589,7 +596,7 @@ useEffect(() => {
 
 
 
-const { data: fetched, isError, isPending, error } = useQuery({
+const { data: fetched, isError } = useQuery({
     queryKey: ['Chat'],
     queryFn: async () => {
       const res = await db.auth.listUsers();
@@ -624,7 +631,7 @@ try{
   })
   clearAll();
   
-  await db.updateDocument("convo", conversationId, {
+  await db.updateDocument("convo", conversationId!, {
   last_message: message,
   last_messageTime: new Date().toISOString(),
   last_sender: UserId,
@@ -632,7 +639,7 @@ try{
 })
 
   }catch(error){
-    alert(error.message)
+    alert((error as Error).message)
   }
 }
 
@@ -724,7 +731,6 @@ console.log(friendName)
             key={msg.id}
             msg={msg.data.text}
             time={FormatTime(msg.data.time)}
-            status={msg.data.isread === false ? "delivered" : "seen"}
             onLongPress={handleLongPress}
           />
         )
