@@ -505,8 +505,6 @@ const { data: conversationId} = useQuery({
   // sort id so order dkesnt matter
   
   const [id1, id2] = [UserId, friendId].sort();
-  console.log(UserId)
-  console.log(friendId)
   //list from database to check if it exixt
   const exist = await db.listDocuments("convo", {
    filters:{ 
@@ -514,9 +512,6 @@ const { data: conversationId} = useQuery({
    user2_id : id2,
    }
  })
- console.log("exist", exist)
- 
- console.log(exist.length)
    
 if(exist.length > 0){
   return exist[0].id
@@ -544,8 +539,6 @@ const { data: chat, isPending:chatpending} = useQuery({
          convoId: conversationId ?? ""
        },
      })
-     console.log("messGes")
-    console.log("chat", res)
      return res
   },
   enabled :!!friendId && !!conversationId
@@ -553,10 +546,6 @@ const { data: chat, isPending:chatpending} = useQuery({
 
 
 useEffect(() => {
-  if(!conversationId) return
-
-  console.log("watcher starting for:", conversationId)
-
   const watcher = db.realtime.collection("messages")
 
   watcher.onConnected(() => {
@@ -564,19 +553,25 @@ useEffect(() => {
   })
 
   watcher.onCreate((payload) => {
-  const msgData = payload.data.data
+  console.log("Oncreate", payload)
+    const msgData = payload.data.data
+    const currentConvoId = queryClient.getQueryData<string>(['conversation', friendId, UserId]);
 
-  if(msgData.convoId === conversationId) {
-    queryClient.setQueryData(["chat", conversationId], (prev: any) => {
-      const newMsg = {
-        id: payload.data.id,
-        data: msgData  // wrap it the same way your existing messages are structured
-      }
-      if(!prev) return [newMsg]
-      return [...prev, newMsg]
-    })
-  } else {
-      console.log("no match — convoId mismatch")
+    if (!currentConvoId) return;
+
+    if(msgData.convoId === currentConvoId) {
+      queryClient.setQueryData(["chat", currentConvoId], (prev: any) => {
+        const newMsg = {
+          id: payload.data.id,
+          data: msgData
+        }
+        if(!prev) return [newMsg]
+
+        const filtered = prev.filter((m: any) =>
+          !(m.data.pending && m.data.text === msgData.text)
+        )
+        return [...filtered, newMsg]
+      })
     }
   })
 
@@ -584,8 +579,11 @@ useEffect(() => {
 
   return () => {
     watcher.disconnect()
+  
   }
-}, [conversationId])
+}, [conversationId ]) // ← empty dependency array — connect ONCE only
+
+
 
 useEffect(() => {
   if(!conversationId) return
@@ -597,7 +595,7 @@ useEffect(() => {
 
 
 const { data: fetched, isError } = useQuery({
-    queryKey: ['Chat'],
+    queryKey: ['FriendsChatList'],
     queryFn: async () => {
       const res = await db.auth.listUsers();
       return res;
@@ -618,30 +616,55 @@ useEffect(() => {
  
 
 //send message 
-async function SendMessage(){
-
-try{
-  await db.createDocument("messages", {
-    text: message,
-    senderId: UserId,
-    isread: false,
-    mediaurl:null,
-    convoId: conversationId,
-    time: new Date().toISOString(),
-  })
-  clearAll();
+async function SendMessage() {
+  const freshConvoId = queryClient.getQueryData<string>(['conversation', friendId, UserId]);
+  console.log("freshConvoId:", freshConvoId) 
   
-  await db.updateDocument("convo", conversationId!, {
-  last_message: message,
-  last_messageTime: new Date().toISOString(),
-  last_sender: UserId,
-  unread_count: currentUnread + 1,
-})
+  const optimisticMsg = {
+    id: crypto.randomUUID(),
+    data: {
+      text: message,
+      senderId: UserId,
+      isread: false,
+      mediaurl: null,
+      convoId: conversationId,
+      time: new Date().toISOString(),
+      pending: true,
+    }
+  };
 
-  }catch(error){
-    alert((error as Error).message)
+  queryClient.setQueryData(["chat", conversationId], (prev: any) => {
+    if (!prev) return [optimisticMsg];
+    return [...prev, optimisticMsg];
+  });
+
+  clearAll();
+
+  try {
+    await db.createDocument("messages", {
+      text: optimisticMsg.data.text,
+      senderId: UserId,
+      isread: false,
+      mediaurl: null,
+      convoId: conversationId,
+      time: optimisticMsg.data.time,
+    });
+
+
+    await db.updateDocument("convo", conversationId, {
+      last_message: optimisticMsg.data.text,
+      last_messageTime: optimisticMsg.data.time,
+      last_sender: UserId,
+      unread_count: currentUnread + 1,
+    });
+
+  } catch (error) {
+    queryClient.invalidateQueries({ queryKey: ["chat", conversationId] });
+    alert((error as Error).message);
   }
 }
+
+
 
 
 if(!friendId){
@@ -656,10 +679,8 @@ if(!friendId){
     return <p style={{color: colors.text}}>An error occurred</p>
   }
  
-  console.log("fetched", fetched)
  
   const friendName = fetched.data.find(u => u.id === friendId)
-console.log(friendName)
 
   return(
     <div className="flex flex-col" style={{
@@ -723,7 +744,13 @@ console.log(friendName)
             key={msg.id}
             msg={msg.data.text}
             time={FormatTime(msg.data.time)}
-            status={msg.data.isread === false ? "delivered" : "seen"}
+            status={msg.data.pending ? (
+  <i className="fas fa-clock text-xs" style={{ color: colors.textSecondary }} />
+) : msg.data.isread ? (
+  <span>seen</span>
+) : (
+  <span>delivered</span>
+)}
             onLongPress={handleLongPress}
           />
         ) : (
