@@ -657,6 +657,7 @@ async function SendMessage() {
       last_sender: UserId,
       unread_count: currentUnread + 1,
     });
+queryClient.invalidateQueries({ queryKey: ['Dms'] });
 
   } catch (error) {
     queryClient.invalidateQueries({ queryKey: ["chat", conversationId] });

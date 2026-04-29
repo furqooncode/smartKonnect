@@ -219,7 +219,10 @@ export default function Addchat({ handleClick }: AddchatProps) {
           ) : (
             friends.data.map((users) => {
               const userProfile = friendDp?.find((dp) => dp.data.user_id === users.id);
-              const lastDm = userConvo?.find((dm) => dm.data.user1_id === users.id);
+      const lastDm = userConvo?.find((dm) => 
+  (dm.data.user1_id === users.id && dm.data.user2_id === userId) ||
+  (dm.data.user1_id === userId && dm.data.user2_id === users.id)
+);
 
               return (
                 <ChatList

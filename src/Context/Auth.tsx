@@ -91,8 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileUrl(URL.createObjectURL(file));
     setProfileSize(formatFileSize(file.size));
   }
+function generateUID(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let uid = '';
+  for (let i = 0; i < 13; i++) {
+    uid += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return uid; // e.g. "a3bkr7mnqx2pl"
+}
 
-  const register = async (email: string, password: string, username: string, fullname: string): Promise<void> => {
+  const register = async (email: string, password: string, username: string,
+  fullname: string, uid: string): Promise<void> => {
     setLoading(true);
     const past = await db.auth.listUsers();
     const taken = past.data.some((u: AppUser) =>
@@ -106,7 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     await db.auth.register({
       email, password,
-      data: { username, fullname }
+      data: { 
+        username, 
+        fullname, 
+        uid: generateUID
+      }
     });
 
     setUser(db.auth.user || null);
