@@ -587,7 +587,7 @@ useEffect(() => {
 
 useEffect(() => {
   if(!conversationId) return
-  db.updateDocument("convo", conversationId, {
+  db.updateDocument("convo", conversationId!, {
     unread_count: 0
   })
 }, [conversationId])
@@ -651,7 +651,7 @@ async function SendMessage() {
     });
 
 
-    await db.updateDocument("convo", conversationId, {
+    await db.updateDocument("convo", conversationId!, {
       last_message: optimisticMsg.data.text,
       last_messageTime: optimisticMsg.data.time,
       last_sender: UserId,
@@ -744,13 +744,13 @@ if(!friendId){
             key={msg.id}
             msg={msg.data.text}
             time={FormatTime(msg.data.time)}
-            status={msg.data.pending ? (
-  <i className="fas fa-clock text-xs" style={{ color: colors.textSecondary }} />
-) : msg.data.isread ? (
-  <span>seen</span>
-) : (
-  <span>delivered</span>
-)}
+            status={msg.data.pending ? 
+  "fas fa-clock text-xs" 
+: msg.data.isread ? 
+  "seen"
+ : 
+  "delivered"
+}
             onLongPress={handleLongPress}
           />
         ) : (
