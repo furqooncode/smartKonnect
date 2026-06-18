@@ -11,7 +11,7 @@ interface Register {
 
 export default function Signup() {
   const { colors } = useTheme()
-  const { register, loading, setLoading } = useAuth()
+  const { register } = useAuth()
   const navigate = useNavigate();
   const [form, setform] = useState<Register>({
     username: "",
@@ -21,6 +21,7 @@ export default function Signup() {
   })
   const [error, setError] = useState<string>("")
   const [showPassword, setShowPassword] = useState(false)
+  const[loading, setloading] = useState<boolean>(false)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const { name, value } = e.target
@@ -53,14 +54,15 @@ export default function Signup() {
 
   async function handleSubmit(): Promise<void> {
     if (!Check()) return
+    setloading(true)
     try {
-      setLoading(true)
       await register(form.email, form.password, form.username, form.fullname)
       alert("User created successfully")
       navigate("/details")
+      setloading(false)
     } catch (error) {
       alert((error as Error).message)
-      setLoading(false)
+      setloading(false)
     }
   }
 

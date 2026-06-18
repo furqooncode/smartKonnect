@@ -16,6 +16,7 @@ export default function Details() {
   const { colors } = useTheme();
   const navigate = useNavigate();
   const { handleImgChange, profileUrl, Addinfo } = useAuth();
+  const[loading, setloading] = useState<boolean>(false)
   const [details, setDetails] = useState<Details>({
     occupation: "",
     gender: "male",
@@ -38,7 +39,7 @@ export default function Details() {
       alert("please fill in all field");
       return;
     }
-
+    setloading(true)
     try {
       await Addinfo(
         details.occupation,
@@ -49,9 +50,12 @@ export default function Details() {
         details.status,
       );
       alert("details uploaded");
+      setloading(false)
       navigate("/Add");
+      
     } catch (error) {
       alert((error as Error).message);
+      setloading(false)
     }
   }
 
@@ -195,8 +199,9 @@ export default function Details() {
             className="border-none outline-none p-[13px] rounded-xl w-full"
             style={{ background: colors.accent, color: colors.accentText }}
             onClick={Submit}
+            disabled={loading}
           >
-            Finish Profile
+          {loading ? "Setting Profile.." : "Finish Profile"}  
           </button>
         </div>
 

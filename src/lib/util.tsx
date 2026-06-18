@@ -1,6 +1,7 @@
 import { Cocobase } from 'cocobase';
 
 const db = new Cocobase({ 
+  baseURL:"https://api.cocobase.cc",
   apiKey: import.meta.env.VITE_COCOBASE_APIKEY,
   projectId: import.meta.env.VITE_COCOBASE_PROJECT_ID
 });

@@ -5,7 +5,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useRef } from 'react'
 import db from '../lib/util.jsx';
 import { useQuery , useQueryClient} from '@tanstack/react-query';
-import { FormatTime } from './FormatTime.tsx'
+import { FormatTime } from './FormatTime.tsx';
+import { Uploadimage } from '../CloudStorage/Uploadimage.ts';
 
 interface Chatoption {
   name: string,
@@ -210,13 +211,16 @@ export function Head({onBack, name, active}:{
   )
 }
 
-export function Sender({msg, time, status, onLongPress}: {
+export function Sender({msg, time, status, onLongPress, mediaurl}: {
   msg: string,
   time: string,
   status: string,
   onLongPress: (e: React.MouseEvent, type: 'sender', msg: string) => void,
+  mediaurl?: string | null,
 }){
   const { colors } = useTheme();
+  const mediaFiles = mediaurl ? JSON.parse(mediaurl) : [];
+
   return(
     <div className="flex justify-end"
     onContextMenu={(e) => {
@@ -228,6 +232,22 @@ export function Sender({msg, time, status, onLongPress}: {
         background: colors.messageSent,
         borderRadius: "16px 0 16px 16px"
       }}>
+        {mediaFiles.length > 0 && (
+          <div className="grid gap-1">
+            {mediaFiles.map((media: { url: string, type: string }, i: number) => (
+              media.type === 'image' ? (
+                <img key={i} src={media.url} className="w-full rounded-xl object-cover max-h-[200px]" />
+              ) : media.type === 'video' ? (
+                <video key={i} src={media.url} controls className="w-full rounded-xl max-h-[200px]" />
+              ) : media.type === 'audio' ? (
+                <audio key={i} src={media.url} controls className="w-full" />
+              ) : (
+                <a key={i} href={media.url} target="_blank" className="text-xs underline"
+                  style={{ color: colors.accent }}>📎 Document</a>
+              )
+            ))}
+          </div>
+        )}
         <span className="text-sm pb-[18px]"
         style={{ color: colors.text }}>{msg}</span>
         <div className="absolute bottom-1 flex justify-between w-full px-2">
@@ -241,12 +261,15 @@ export function Sender({msg, time, status, onLongPress}: {
   )
 }
 
-export function Receiver({msg, time, onLongPress}: {
+export function Receiver({msg, time, onLongPress, mediaurl}: {
   msg: string,
   time: string,
   onLongPress: (e: React.MouseEvent, type: 'receiver', msg: string) => void,
+  mediaurl?: string | null,
 }){
   const { colors } = useTheme();
+  const mediaFiles = mediaurl ? JSON.parse(mediaurl) : [];
+
   return(
     <div className="flex justify-start"
     onContextMenu={(e) => {
@@ -258,6 +281,22 @@ export function Receiver({msg, time, onLongPress}: {
         background: colors.messageReceived,
         borderRadius: "0 16px 16px 16px"
       }}>
+        {mediaFiles.length > 0 && (
+          <div className="grid gap-1">
+            {mediaFiles.map((media: { url: string, type: string }, i: number) => (
+              media.type === 'image' ? (
+                <img key={i} src={media.url} className="w-full rounded-xl object-cover max-h-[200px]" />
+              ) : media.type === 'video' ? (
+                <video key={i} src={media.url} controls className="w-full rounded-xl max-h-[200px]" />
+              ) : media.type === 'audio' ? (
+                <audio key={i} src={media.url} controls className="w-full" />
+              ) : (
+                <a key={i} href={media.url} target="_blank" className="text-xs underline"
+                  style={{ color: colors.accent }}>📎 Document</a>
+              )
+            ))}
+          </div>
+        )}
         <span className="text-sm pb-[18px]"
         style={{ color: colors.text }}>{msg}</span>
         <div className="absolute bottom-1 flex justify-end w-full px-2">
@@ -268,6 +307,8 @@ export function Receiver({msg, time, onLongPress}: {
     </div>
   )
 }
+
+
 
 function Input({setAdd, inputRef, handleSendText }: InputProps){
   const { colors } = useTheme();
@@ -392,7 +433,7 @@ export default function Chatting({onBack} : {
   onBack:()=> void,
 }) {
   const { colors } = useTheme()
-  const { message, clearAll } = useChat();
+  const { message, clearAll, selectedMedia } = useChat();
   const queryClient = useQueryClient()
   const { handleSelectMedia } = useChat()
   const [add, setAdd] = useState<boolean>(false)
@@ -618,53 +659,136 @@ useEffect(() => {
 //send message 
 async function SendMessage() {
   const freshConvoId = queryClient.getQueryData<string>(['conversation', friendId, UserId]);
-  console.log("freshConvoId:", freshConvoId) 
   
-  const optimisticMsg = {
-    id: crypto.randomUUID(),
-    data: {
-      text: message,
-      senderId: UserId,
-      isread: false,
-      mediaurl: null,
-      convoId: conversationId,
-      time: new Date().toISOString(),
-      pending: true,
+  if (!message.trim() && selectedMedia.length === 0) return;
+  if (!freshConvoId) return;
+
+  if (selectedMedia.length > 0) {
+    // optimistic — use blob previews immediately
+    const optimisticMedia = selectedMedia.map((media) => ({
+      url: media.previewUrl,
+      type: media.type,
+    }));
+
+    const optimisticId = crypto.randomUUID();
+    const optimisticMsg = {
+      id: optimisticId,
+      data: {
+        text: message,
+        senderId: UserId,
+        isread: false,
+        mediaurl: JSON.stringify(optimisticMedia),
+        convoId: freshConvoId,
+        time: new Date().toISOString(),
+        pending: true,
+      }
+    };
+
+    queryClient.setQueryData(["chat", freshConvoId], (prev: any) => {
+      if (!prev) return [optimisticMsg];
+      return [...prev, optimisticMsg];
+    });
+
+    clearAll();
+
+    try {
+      const uploadedUrls = await Promise.all(
+        selectedMedia.map(async (media) => {
+          const result = await Uploadimage(media.file);
+          return { url: result.url, type: media.type };
+        })
+      );
+
+      await db.createDocument("messages", {
+        text: message,
+        senderId: UserId,
+        isread: false,
+        mediaurl: JSON.stringify(uploadedUrls),
+        convoId: freshConvoId,
+        time: optimisticMsg.data.time,
+      });
+
+      queryClient.setQueryData(["chat", freshConvoId], (prev: any) =>
+        prev?.map((m: any) =>
+          m.id === optimisticId
+            ? { ...m, data: { ...m.data, mediaurl: JSON.stringify(uploadedUrls), pending: false } }
+            : m
+        )
+      );
+
+   await db.updateDocument("convo", freshConvoId, {
+    last_message: message || "Media",
+        last_messageTime: optimisticMsg.data.time,
+        last_sender: UserId,
+        unread_count: currentUnread + 1,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['Dms'] });
+
+    } catch (error) {
+      queryClient.setQueryData(["chat", freshConvoId], (prev: any) =>
+        prev?.filter((m: any) => m.id !== optimisticId)
+      );
+      alert((error as Error).message);
     }
-  };
 
-  queryClient.setQueryData(["chat", conversationId], (prev: any) => {
-    if (!prev) return [optimisticMsg];
-    return [...prev, optimisticMsg];
-  });
+  } else {
+    const optimisticId = crypto.randomUUID();
+    const optimisticMsg = {
+      id: optimisticId,
+      data: {
+        text: message,
+        senderId: UserId,
+        isread: false,
+        mediaurl: null,
+        convoId: freshConvoId,
+        time: new Date().toISOString(),
+        pending: true,
+      }
+    };
 
-  clearAll();
-
-  try {
-    await db.createDocument("messages", {
-      text: optimisticMsg.data.text,
-      senderId: UserId,
-      isread: false,
-      mediaurl: null,
-      convoId: conversationId,
-      time: optimisticMsg.data.time,
+    queryClient.setQueryData(["chat", freshConvoId], (prev: any) => {
+      if (!prev) return [optimisticMsg];
+      return [...prev, optimisticMsg];
     });
 
+    clearAll();
 
-    await db.updateDocument("convo", conversationId!, {
-      last_message: optimisticMsg.data.text,
-      last_messageTime: optimisticMsg.data.time,
-      last_sender: UserId,
-      unread_count: currentUnread + 1,
-    });
-queryClient.invalidateQueries({ queryKey: ['Dms'] });
+    try {
+      await db.createDocument("messages", {
+        text: optimisticMsg.data.text,
+        senderId: UserId,
+        isread: false,
+        mediaurl: null,
+        convoId: freshConvoId,
+        time: optimisticMsg.data.time,
+      });
 
-  } catch (error) {
-    queryClient.invalidateQueries({ queryKey: ["chat", conversationId] });
-    alert((error as Error).message);
+      queryClient.setQueryData(["chat", freshConvoId], (prev: any) =>
+        prev?.map((m: any) =>
+          m.id === optimisticId
+            ? { ...m, data: { ...m.data, pending: false } }
+            : m
+        )
+      );
+
+      await db.updateDocument("convo", freshConvoId, {
+        last_message: optimisticMsg.data.text,
+        last_messageTime: optimisticMsg.data.time,
+        last_sender: UserId,
+        unread_count: currentUnread + 1,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['Dms'] });
+
+    } catch (error) {
+      queryClient.setQueryData(["chat", freshConvoId], (prev: any) =>
+        prev?.filter((m: any) => m.id !== optimisticId)
+      );
+      alert((error as Error).message);
+    }
   }
 }
-
 
 
 
@@ -736,33 +860,35 @@ if(!friendId){
       </div>
 
     </div>
-  ) : (
-    [...chat]
-      .sort((a, b) => new Date(a.data.time).getTime() - new Date(b.data.time).getTime())
-      .map((msg) => (
-        msg.data.senderId === UserId ? (
-          <Sender
-            key={msg.id}
-            msg={msg.data.text}
-            time={FormatTime(msg.data.time)}
-            status={msg.data.pending ? 
-  "fas fa-clock text-xs" 
-: msg.data.isread ? 
-  "seen"
- : 
-  "delivered"
-}
-            onLongPress={handleLongPress}
-          />
-        ) : (
-          <Receiver
-            key={msg.id}
-            msg={msg.data.text}
-            time={FormatTime(msg.data.time)}
-            onLongPress={handleLongPress}
-          />
-        )
-      ))
+  ) :  (
+[...chat]
+  .sort((a, b) => new Date(a.data.time).getTime() - new Date(b.data.time).getTime())
+  .map((msg) => (
+    msg.data.senderId === UserId ? (
+      <Sender
+        key={msg.id}
+        msg={msg.data.text}
+        time={FormatTime(msg.data.time)}
+        status={msg.data.pending ? 
+          "fas fa-clock text-xs" 
+        : msg.data.isread ? 
+          "seen"
+        : 
+          "delivered"
+        }
+        onLongPress={handleLongPress}
+        mediaurl={msg.data.mediaurl}
+      />
+    ) : (
+      <Receiver
+        key={msg.id}
+        msg={msg.data.text}
+        time={FormatTime(msg.data.time)}
+        onLongPress={handleLongPress}
+        mediaurl={msg.data.mediaurl}
+      />
+    )
+  ))
   )}
 </div>
 

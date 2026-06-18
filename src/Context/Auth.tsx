@@ -14,7 +14,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>,
   logout: () => Promise<void>,
   user: AppUser | null,
-  loading: boolean,
   isAuthenticated: boolean,
   selectedPics: File | null,
   profileUrl: string | null,
@@ -30,10 +29,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [selectedPics, setSelectedPics] = useState<File | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | null>(defaultImg);
   const [profileSize, setProfileSize] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false)
 
   useEffect(() => {
     const initAuth = async () => {
@@ -94,11 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 function generateUID(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let uid = '';
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < 20; i++) {
     uid += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return uid; // e.g. "a3bkr7mnqx2pl"
+  return uid;
 }
+
+const joinDate = new Date().toLocaleDateString('en-GB', {
+  day: 'numeric',
+  month: 'long', 
+  year: 'numeric',
+}).replace(/(\d+) (\w+) (\d+)/, '$1, $2 $3');
+
 
   const register = async (email: string, password: string, username: string,
   fullname: string, uid: string): Promise<void> => {
@@ -118,7 +124,8 @@ function generateUID(): string {
       data: { 
         username, 
         fullname, 
-        uid: generateUID
+        uid: generateUID,
+        memberSince: joinDate,
       }
     });
 
@@ -182,14 +189,14 @@ function generateUID(): string {
       login,
       logout,
       user,
-      loading,
+      
       isAuthenticated: !!user,
       selectedPics,
       profileUrl,
       profileSize,
       Addinfo,
       handleImgChange,
-      setLoading,
+  
     }}>
       {children}
     </AuthContext.Provider>

@@ -10,7 +10,7 @@ interface Login {
 
 export default function Login() {
   const { colors } = useTheme();
-  const { login, loading } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setform] = useState<Login>({
     email: "",
@@ -18,6 +18,7 @@ export default function Login() {
   });
   const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setloading] = useState<boolean>(false)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -45,12 +46,15 @@ export default function Login() {
 
   async function handleSubmit(): Promise<void> {
     if (!Check()) return;
+    setloading(true)
     try {
       await login(form.email, form.password);
       alert("User logged in");
+      setloading(false)
       navigate("/Add");
     } catch (error) {
       alert((error as Error).message);
+      setloading(false)
     }
   }
 
