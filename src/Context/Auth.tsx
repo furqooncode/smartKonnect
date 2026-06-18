@@ -21,6 +21,7 @@ interface AuthContextType {
   Addinfo: (occupation: string, country: string, state: string, gender: string, about: string, status: string) => Promise<void>,
   handleImgChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
   setLoading: (val: boolean) => void,
+  loading: boolean,
 }
 
 const defaultImg = "https://res.cloudinary.com/dlijiq0w3/image/upload/v1775963049/ldqbwxn1zpgxqoutdszh.jpg";
@@ -90,24 +91,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileUrl(URL.createObjectURL(file));
     setProfileSize(formatFileSize(file.size));
   }
-function generateUID(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let uid = '';
-  for (let i = 0; i < 20; i++) {
-    uid += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return uid;
-}
 
-const joinDate = new Date().toLocaleDateString('en-GB', {
-  day: 'numeric',
-  month: 'long', 
-  year: 'numeric',
-}).replace(/(\d+) (\w+) (\d+)/, '$1, $2 $3');
+  function generateUID(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let uid = '';
+    for (let i = 0; i < 20; i++) {
+      uid += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return uid;
+  }
+
+  const joinDate = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long', 
+    year: 'numeric',
+  }).replace(/(\d+) (\w+) (\d+)/, '$1, $2 $3');
 
 
   const register = async (email: string, password: string, username: string,
-  fullname: string, uid: string): Promise<void> => {
+  fullname: string): Promise<void> => {
     setLoading(true);
     const past = await db.auth.listUsers();
     const taken = past.data.some((u: AppUser) =>
@@ -124,7 +126,7 @@ const joinDate = new Date().toLocaleDateString('en-GB', {
       data: { 
         username, 
         fullname, 
-        uid: generateUID,
+        uid: generateUID(),
         memberSince: joinDate,
       }
     });
@@ -189,14 +191,14 @@ const joinDate = new Date().toLocaleDateString('en-GB', {
       login,
       logout,
       user,
-      
       isAuthenticated: !!user,
       selectedPics,
       profileUrl,
       profileSize,
       Addinfo,
       handleImgChange,
-  
+      setLoading,
+      loading,
     }}>
       {children}
     </AuthContext.Provider>

@@ -183,7 +183,7 @@ export default function Addchat({ handleClick }: AddchatProps) {
     queryKey: ['Dms'],
     queryFn: async () => {
       const friends = await db.auth.listUsers();
-      const friendDp = await db.listDocuments("Details");
+      const friendDp = await db.listDocuments("details");
       const userConvo = await db.listDocuments("convo");
       return { friends, friendDp, userConvo };
     },
